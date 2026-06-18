@@ -210,6 +210,17 @@ namespace MHStore.Repositories.Migrations
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("11111111-1111-1111-1111-111111111111"),
+                            CreatedAt = new DateTime(2026, 6, 18, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FullName = "MHStore Admin",
+                            PasswordHash = "PBKDF2-SHA256.100000.TUhTdG9yZUFkbWluU2VlZA==.ACC1yxE9bTR835zC2Kuy+pf+C5xgL43C/BtSYOfKpb4=",
+                            Role = "Admin",
+                            Username = "admin"
+                        });
                 });
 
             modelBuilder.Entity("MHStore.Repositories.Entities.OrderItem", b =>

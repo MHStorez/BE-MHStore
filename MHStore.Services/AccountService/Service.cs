@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -13,10 +12,6 @@ namespace MHStore.Services.AccountService;
 public class Service : IService
 {
     private static readonly HashSet<string> AllowedRoles = ["Admin", "Customer"];
-    private const int SaltSize = 16;
-    private const int KeySize = 32;
-    private const int Iterations = 100_000;
-
     private readonly AppDbContext _context;
     private readonly JwtOptions _jwtOptions;
 
@@ -45,7 +40,7 @@ public class Service : IService
         {
             Id = Guid.NewGuid(),
             Username = username,
-            PasswordHash = HashPassword(request.Password),
+            PasswordHash = PasswordHasher.Hash(request.Password),
             FullName = request.FullName.Trim(),
             Role = role,
             CreatedAt = DateTime.UtcNow
@@ -69,7 +64,7 @@ public class Service : IService
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Username == username);
 
-        if (user == null || !VerifyPassword(request.Password, user.PasswordHash))
+        if (user == null || !PasswordHasher.Verify(request.Password, user.PasswordHash))
         {
             throw new ArgumentException("Invalid username or password.");
         }
@@ -155,38 +150,4 @@ public class Service : IService
         return normalizedRole;
     }
 
-    private static string HashPassword(string password)
-    {
-        var salt = RandomNumberGenerator.GetBytes(SaltSize);
-        var key = Rfc2898DeriveBytes.Pbkdf2(
-            password,
-            salt,
-            Iterations,
-            HashAlgorithmName.SHA256,
-            KeySize);
-
-        return $"PBKDF2-SHA256.{Iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(key)}";
-    }
-
-    private static bool VerifyPassword(string password, string passwordHash)
-    {
-        var parts = passwordHash.Split('.');
-
-        if (parts.Length != 4 || parts[0] != "PBKDF2-SHA256")
-        {
-            return false;
-        }
-
-        var iterations = int.Parse(parts[1]);
-        var salt = Convert.FromBase64String(parts[2]);
-        var expectedKey = Convert.FromBase64String(parts[3]);
-        var actualKey = Rfc2898DeriveBytes.Pbkdf2(
-            password,
-            salt,
-            iterations,
-            HashAlgorithmName.SHA256,
-            expectedKey.Length);
-
-        return CryptographicOperations.FixedTimeEquals(actualKey, expectedKey);
-    }
 }

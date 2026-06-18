@@ -35,7 +35,21 @@ SePay__WebhookApiKey="..."
 SePay__BankCode="..."
 SePay__AccountNumber="..."
 SePay__AccountName="MHStore"
+AdminSeed__Enabled="true"
+AdminSeed__Username="admin"
+AdminSeed__Password="Admin@123"
+AdminSeed__FullName="MHStore Admin"
+AdminSeed__ResetPassword="true"
 ```
+
+## Admin login seed
+
+In development, if no `AdminSeed` config is provided, the API seeds a local admin account after migrations:
+
+- username: `admin`
+- password: `Admin@123`
+
+In development defaults, `AdminSeed__ResetPassword=true` resets the local `admin` password on startup so `admin / Admin@123` stays usable. For production, set `AdminSeed__Enabled=false` or provide a strong temporary password with `AdminSeed__ResetPassword=false` and rotate it after first login.
 
 ## Local development
 

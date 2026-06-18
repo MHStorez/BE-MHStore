@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MHStore.Repositories.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260531095927_InitialCreate")]
+    [Migration("20260618112257_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -180,26 +180,32 @@ namespace MHStore.Repositories.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("FullName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("full_name");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("password_hash");
 
                     b.Property<string>("Role")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("role");
 
                     b.Property<string>("Username")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("username");
 
                     b.HasKey("Id");
 
@@ -207,6 +213,17 @@ namespace MHStore.Repositories.Migrations
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("11111111-1111-1111-1111-111111111111"),
+                            CreatedAt = new DateTime(2026, 6, 18, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FullName = "MHStore Admin",
+                            PasswordHash = "PBKDF2-SHA256.100000.TUhTdG9yZUFkbWluU2VlZA==.ACC1yxE9bTR835zC2Kuy+pf+C5xgL43C/BtSYOfKpb4=",
+                            Role = "Admin",
+                            Username = "admin"
+                        });
                 });
 
             modelBuilder.Entity("MHStore.Repositories.Entities.OrderItem", b =>

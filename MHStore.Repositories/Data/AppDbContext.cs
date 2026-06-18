@@ -73,6 +73,16 @@ public class AppDbContext : DbContext
             entity.Property(e => e.Role).HasColumnName("role").IsRequired();
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
             entity.HasIndex(e => e.Username).IsUnique();
+
+            entity.HasData(new User
+            {
+                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                Username = "admin",
+                PasswordHash = "PBKDF2-SHA256.100000.TUhTdG9yZUFkbWluU2VlZA==.ACC1yxE9bTR835zC2Kuy+pf+C5xgL43C/BtSYOfKpb4=",
+                FullName = "MHStore Admin",
+                Role = "Admin",
+                CreatedAt = new DateTime(2026, 6, 18, 0, 0, 0, DateTimeKind.Utc)
+            });
         });
     }
 }

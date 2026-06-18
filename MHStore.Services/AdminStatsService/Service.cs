@@ -1,10 +1,13 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using MHStore.Repositories.Data;
+using MHStore.Services.OrderService;
 
 namespace MHStore.Services.AdminStatsService;
 
 public class Service : IService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly AppDbContext _context;
 
     public Service(AppDbContext context)
@@ -30,12 +33,22 @@ public class Service : IService
                 order.Status == "Pending" &&
                 order.CreatedAt >= today &&
                 order.CreatedAt < tomorrow);
-        var bestSellingProduct = await _context.OrderItems
+        var pendingOrderCount = await _context.Orders
             .AsNoTracking()
-            .Where(item =>
-                item.Order.Status == "Completed" &&
-                item.Order.CreatedAt >= today &&
-                item.Order.CreatedAt < tomorrow)
+            .CountAsync(order => order.Status == "Pending");
+        var completedOrderCount = await _context.Orders
+            .AsNoTracking()
+            .CountAsync(order => order.Status == "Completed");
+        var totalOrderCount = await _context.Orders
+            .AsNoTracking()
+            .CountAsync();
+        var totalRevenue = await _context.Orders
+            .AsNoTracking()
+            .Where(order => order.Status == "Completed")
+            .SumAsync(order => order.TotalPrice);
+        var topProducts = await _context.OrderItems
+            .AsNoTracking()
+            .Where(item => item.Order.Status == "Completed")
             .GroupBy(item => new { item.ProductId, item.ProductName })
             .Select(group => new BestSellingProductResponse
             {
@@ -46,13 +59,80 @@ public class Service : IService
             })
             .OrderByDescending(item => item.QuantitySold)
             .ThenByDescending(item => item.Revenue)
-            .FirstOrDefaultAsync();
+            .Take(5)
+            .ToListAsync();
+        var completedCustomerOrders = await _context.Orders
+            .AsNoTracking()
+            .Where(order => order.Status == "Completed")
+            .Select(order => new
+            {
+                order.CustomerInfo,
+                order.TotalPrice,
+                order.CreatedAt
+            })
+            .ToListAsync();
+        var topCustomers = completedCustomerOrders
+            .Select(order => new
+            {
+                Customer = DeserializeCustomer(order.CustomerInfo),
+                order.TotalPrice,
+                order.CreatedAt
+            })
+            .Where(order => order.Customer != null)
+            .GroupBy(order => NormalizePhone(order.Customer!.Phone))
+            .Where(group => !string.IsNullOrWhiteSpace(group.Key))
+            .Select(group =>
+            {
+                var latestOrder = group.OrderByDescending(order => order.CreatedAt).First();
+
+                return new CustomerSummaryResponse
+                {
+                    Name = string.IsNullOrWhiteSpace(latestOrder.Customer!.Name)
+                        ? "Khách chưa nhập tên"
+                        : latestOrder.Customer.Name.Trim(),
+                    Phone = latestOrder.Customer.Phone.Trim(),
+                    OrderCount = group.Count(),
+                    TotalSpent = group.Sum(order => order.TotalPrice),
+                    LastOrderAt = group.Max(order => order.CreatedAt)
+                };
+            })
+            .OrderByDescending(customer => customer.TotalSpent)
+            .ThenByDescending(customer => customer.OrderCount)
+            .Take(5)
+            .ToList();
 
         return new Response
         {
             TodayRevenue = todayRevenue,
             NewOrderCount = newOrderCount,
-            BestSellingProduct = bestSellingProduct
+            PendingOrderCount = pendingOrderCount,
+            CompletedOrderCount = completedOrderCount,
+            TotalOrderCount = totalOrderCount,
+            TotalRevenue = totalRevenue,
+            BestSellingProduct = topProducts.FirstOrDefault(),
+            TopProducts = topProducts,
+            TopCustomers = topCustomers
         };
     }
+
+    private static CustomerInfoResponse? DeserializeCustomer(string customerInfo)
+    {
+        if (string.IsNullOrWhiteSpace(customerInfo))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<CustomerInfoResponse>(customerInfo, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string NormalizePhone(string phone) =>
+        new(phone.Where(char.IsDigit).ToArray());
+
 }

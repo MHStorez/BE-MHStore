@@ -117,6 +117,11 @@ namespace MHStore.Repositories.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.InsertData(
+                table: "Users",
+                columns: new[] { "id", "created_at", "full_name", "password_hash", "role", "username" },
+                values: new object[] { new Guid("11111111-1111-1111-1111-111111111111"), new DateTime(2026, 6, 18, 0, 0, 0, 0, DateTimeKind.Utc), "MHStore Admin", "PBKDF2-SHA256.100000.TUhTdG9yZUFkbWluU2VlZA==.ACC1yxE9bTR835zC2Kuy+pf+C5xgL43C/BtSYOfKpb4=", "Admin", "admin" });
+
             migrationBuilder.CreateIndex(
                 name: "IX_OrderItems_OrderId",
                 table: "OrderItems",
@@ -128,7 +133,7 @@ namespace MHStore.Repositories.Migrations
                 column: "OrderId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Users_Username",
+                name: "IX_Users_username",
                 table: "Users",
                 column: "username",
                 unique: true);
