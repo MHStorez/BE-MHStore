@@ -65,7 +65,10 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.CustomSchemaIds(type => type.FullName?.Replace('+', '.') ?? type.Name);
+});
 
 var app = builder.Build();
 
