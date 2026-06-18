@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MHStore.API", "MHStore.API\MHStore.API.csproj", "{8A693B2F-F9C1-4076-A7D4-B59F556F12FE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MHStore.Services", "MHStore.Services\MHStore.Services.csproj", "{A7A12935-8FB3-4985-BD1E-DBCF934133DD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MHStore.Repositories", "MHStore.Repositories\MHStore.Repositories.csproj", "{BE356E2F-BE3C-417D-BECA-4E982DC6A6E5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8A693B2F-F9C1-4076-A7D4-B59F556F12FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8A693B2F-F9C1-4076-A7D4-B59F556F12FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8A693B2F-F9C1-4076-A7D4-B59F556F12FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8A693B2F-F9C1-4076-A7D4-B59F556F12FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A7A12935-8FB3-4985-BD1E-DBCF934133DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A7A12935-8FB3-4985-BD1E-DBCF934133DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A7A12935-8FB3-4985-BD1E-DBCF934133DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A7A12935-8FB3-4985-BD1E-DBCF934133DD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BE356E2F-BE3C-417D-BECA-4E982DC6A6E5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BE356E2F-BE3C-417D-BECA-4E982DC6A6E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BE356E2F-BE3C-417D-BECA-4E982DC6A6E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BE356E2F-BE3C-417D-BECA-4E982DC6A6E5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

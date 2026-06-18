@@ -1,0 +1,17 @@
+.git
+.github
+.vs
+.idea
+.vscode
+**/bin/
+**/obj/
+**/TestResults/
+**/*.user
+**/*.suo
+**/*.log
+publish/
+MHStore.API/appsettings.json
+MHStore.API/appsettings.Development.json
+.env
+.env.*
+!.env.example
