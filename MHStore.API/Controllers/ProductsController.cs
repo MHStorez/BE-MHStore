@@ -23,7 +23,8 @@ public class ProductsController : ControllerBase
         [FromQuery] string? category = null,
         [FromQuery] bool includeUnavailable = false)
     {
-        var products = await _productService.GetAllAsync(search, category, includeUnavailable);
+        var canIncludeUnavailable = includeUnavailable && User.IsInRole("Admin");
+        var products = await _productService.GetAllAsync(search, category, canIncludeUnavailable);
 
         return Ok(products);
     }
@@ -31,7 +32,7 @@ public class ProductsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<ProductResponse>> GetProduct(Guid id)
     {
-        var product = await _productService.GetByIdAsync(id);
+        var product = await _productService.GetByIdAsync(id, User.IsInRole("Admin"));
 
         if (product == null)
         {

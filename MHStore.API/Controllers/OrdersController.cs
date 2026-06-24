@@ -4,6 +4,7 @@ using OrderRequest = MHStore.Services.OrderService.Request;
 using OrderResponse = MHStore.Services.OrderService.Response;
 using OrderService = MHStore.Services.OrderService.IService;
 using OrderStatusRequest = MHStore.Services.OrderService.StatusRequest;
+using DirectBuyRequest = MHStore.Services.OrderService.DirectBuyRequest;
 
 namespace MHStore.API.Controllers;
 
@@ -48,6 +49,21 @@ public class OrdersController : ControllerBase
         try
         {
             var order = await _orderService.CreateAsync(request);
+
+            return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, order);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+    }
+
+    [HttpPost("direct")]
+    public async Task<ActionResult<OrderResponse>> CreateDirectOrder(DirectBuyRequest request)
+    {
+        try
+        {
+            var order = await _orderService.CreateDirectAsync(request);
 
             return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, order);
         }

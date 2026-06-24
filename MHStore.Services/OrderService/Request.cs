@@ -6,6 +6,13 @@ public class Request
     public List<OrderItemRequest> Items { get; set; } = [];
 }
 
+public class DirectBuyRequest
+{
+    public CustomerInfoRequest CustomerInfo { get; set; } = new();
+    public string ProductId { get; set; } = string.Empty;
+    public int Quantity { get; set; } = 1;
+}
+
 public class StatusRequest
 {
     public string Status { get; set; } = string.Empty;

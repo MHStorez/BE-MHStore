@@ -45,11 +45,16 @@ public class Service : IService
         return products.Select(ToResponse);
     }
 
-    public async Task<Response?> GetByIdAsync(Guid id)
+    public async Task<Response?> GetByIdAsync(Guid id, bool includeUnavailable = false)
     {
-        var product = await _context.Products
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == id);
+        var query = _context.Products.AsNoTracking();
+
+        if (!includeUnavailable)
+        {
+            query = query.Where(p => p.IsAvailable);
+        }
+
+        var product = await query.FirstOrDefaultAsync(p => p.Id == id);
 
         return product == null ? null : ToResponse(product);
     }

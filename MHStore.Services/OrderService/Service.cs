@@ -42,30 +42,23 @@ public class Service : IService
     {
         Validate(request);
 
-        var customer = Sanitize(request.CustomerInfo);
-        var order = new Order
+        return await CreateOrderAsync(request.CustomerInfo, request.Items);
+    }
+
+    public async Task<Response> CreateDirectAsync(DirectBuyRequest request)
+    {
+        if (request.Quantity <= 0)
         {
-            Id = Guid.NewGuid(),
-            CustomerInfo = JsonSerializer.Serialize(customer, JsonOptions),
-            TotalPrice = request.Items.Sum(item => item.UnitPrice * item.Quantity),
-            Status = "Pending",
-            CreatedAt = DateTime.UtcNow
-        };
+            throw new ArgumentException("Quantity must be greater than zero.");
+        }
 
-        order.Items = request.Items.Select(item => new OrderItem
-        {
-            Id = Guid.NewGuid(),
-            OrderId = order.Id,
-            ProductId = Guid.Parse(item.ProductId),
-            ProductName = item.ProductName,
-            Quantity = item.Quantity,
-            UnitPrice = item.UnitPrice
-        }).ToList();
-
-        await _context.Orders.AddAsync(order);
-        await _context.SaveChangesAsync();
-
-        return ToResponse(order);
+        return await CreateOrderAsync(
+            request.CustomerInfo,
+            [new OrderItemRequest
+            {
+                ProductId = request.ProductId,
+                Quantity = request.Quantity
+            }]);
     }
 
     public async Task<Response?> UpdateStatusAsync(Guid id, StatusRequest request)
@@ -87,6 +80,87 @@ public class Service : IService
         return ToResponse(order);
     }
 
+    private async Task<Response> CreateOrderAsync(CustomerInfoRequest customerInfo, List<OrderItemRequest> requestedItems)
+    {
+        var parsedItems = ParseRequestedItems(requestedItems);
+        var productIds = parsedItems.Select(item => item.ProductId).Distinct().ToList();
+        var products = await _context.Products
+            .AsNoTracking()
+            .Where(product => productIds.Contains(product.Id))
+            .ToDictionaryAsync(product => product.Id);
+
+        var orderItems = new List<OrderItem>();
+
+        foreach (var item in parsedItems)
+        {
+            if (!products.TryGetValue(item.ProductId, out var product))
+            {
+                throw new ArgumentException("One or more products were not found.");
+            }
+
+            if (!product.IsAvailable)
+            {
+                throw new ArgumentException($"Product '{product.Name}' is not available.");
+            }
+
+            orderItems.Add(new OrderItem
+            {
+                Id = Guid.NewGuid(),
+                ProductId = product.Id,
+                ProductName = product.Name,
+                Quantity = item.Quantity,
+                UnitPrice = product.Price
+            });
+        }
+
+        var customer = Sanitize(customerInfo);
+        var order = new Order
+        {
+            Id = Guid.NewGuid(),
+            CustomerInfo = JsonSerializer.Serialize(customer, JsonOptions),
+            TotalPrice = orderItems.Sum(item => item.UnitPrice * item.Quantity),
+            Status = "Pending",
+            CreatedAt = DateTime.UtcNow,
+            Items = orderItems
+        };
+
+        foreach (var item in order.Items)
+        {
+            item.OrderId = order.Id;
+        }
+
+        await _context.Orders.AddAsync(order);
+        await _context.SaveChangesAsync();
+
+        return ToResponse(order);
+    }
+
+    private static List<ParsedOrderItem> ParseRequestedItems(IEnumerable<OrderItemRequest> items)
+    {
+        var parsedItems = new List<ParsedOrderItem>();
+
+        foreach (var item in items)
+        {
+            if (!Guid.TryParse(item.ProductId, out var productId))
+            {
+                throw new ArgumentException("Every order item must have a valid product id.");
+            }
+
+            var existingItem = parsedItems.FirstOrDefault(parsed => parsed.ProductId == productId);
+
+            if (existingItem == null)
+            {
+                parsedItems.Add(new ParsedOrderItem(productId, item.Quantity));
+            }
+            else
+            {
+                existingItem.Quantity += item.Quantity;
+            }
+        }
+
+        return parsedItems;
+    }
+
     private static void Validate(Request request)
     {
         if (request.Items.Count == 0)
@@ -94,20 +168,22 @@ public class Service : IService
             throw new ArgumentException("Order must contain at least one item.");
         }
 
-        if (request.Items.Any(item => string.IsNullOrWhiteSpace(item.ProductName)))
-        {
-            throw new ArgumentException("Every order item must have a product name.");
-        }
-
         if (request.Items.Any(item => item.Quantity <= 0))
         {
             throw new ArgumentException("Every order item quantity must be greater than zero.");
         }
+    }
 
-        if (request.Items.Any(item => item.UnitPrice <= 0))
+    private sealed class ParsedOrderItem
+    {
+        public ParsedOrderItem(Guid productId, int quantity)
         {
-            throw new ArgumentException("Every order item unit price must be greater than zero.");
+            ProductId = productId;
+            Quantity = quantity;
         }
+
+        public Guid ProductId { get; }
+        public int Quantity { get; set; }
     }
 
     private static CustomerInfoResponse Sanitize(CustomerInfoRequest customer)
