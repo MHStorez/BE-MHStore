@@ -8,7 +8,7 @@ namespace MHStore.Services.OrderService;
 public class Service : IService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly HashSet<string> AllowedStatuses = ["Pending", "Completed", "PaymentFailed"];
+    private static readonly HashSet<string> AllowedStatuses = ["Completed"];
     private readonly AppDbContext _context;
 
     public Service(AppDbContext context)
@@ -67,14 +67,24 @@ public class Service : IService
 
         if (!AllowedStatuses.Contains(status))
         {
-            throw new ArgumentException("Order status must be Pending, Completed, or PaymentFailed.");
+            throw new ArgumentException("Only Completed status can be set by admin.");
         }
 
         var order = await _context.Orders.Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == id);
 
         if (order == null) return null;
 
-        order.Status = status;
+        if (order.PaymentStatus != "Paid")
+        {
+            throw new ArgumentException("Only paid orders can be completed.");
+        }
+
+        if (order.Status != "Processing")
+        {
+            throw new ArgumentException("Only processing orders can be completed.");
+        }
+
+        order.Status = "Completed";
         await _context.SaveChangesAsync();
 
         return ToResponse(order);
@@ -120,6 +130,7 @@ public class Service : IService
             CustomerInfo = JsonSerializer.Serialize(customer, JsonOptions),
             TotalPrice = orderItems.Sum(item => item.UnitPrice * item.Quantity),
             Status = "Pending",
+            PaymentStatus = "Pending",
             CreatedAt = DateTime.UtcNow,
             Items = orderItems
         };
@@ -212,6 +223,7 @@ public class Service : IService
             }).ToList(),
             TotalPrice = order.TotalPrice,
             Status = order.Status,
+            PaymentStatus = order.PaymentStatus,
             CreatedAt = order.CreatedAt
         };
     }

@@ -26,7 +26,12 @@ public class AppDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Name).HasColumnName("name").IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Description).HasColumnName("description");
             entity.Property(e => e.Price).HasColumnName("price").HasPrecision(18, 2);
+            entity.Property(e => e.ImageUrl).HasColumnName("image_url");
+            entity.Property(e => e.CategoryId).HasColumnName("category_id");
+            entity.Property(e => e.IsAvailable).HasColumnName("is_available");
+            entity.HasOne(e => e.Category).WithMany(c => c.Products).HasForeignKey(e => e.CategoryId);
         });
 
         modelBuilder.Entity<Order>(entity =>
@@ -37,6 +42,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.CustomerInfo).HasColumnName("customer_info").HasColumnType("jsonb");
             entity.Property(e => e.TotalPrice).HasColumnName("total_price").HasPrecision(18, 2);
             entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50);
+            entity.Property(e => e.PaymentStatus).HasColumnName("payment_status").HasMaxLength(50);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
         });
 
@@ -60,6 +66,10 @@ public class AppDbContext : DbContext
         {
             entity.ToTable("Categories");
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(120);
+            entity.Property(e => e.Slug).IsRequired().HasMaxLength(160);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            entity.HasIndex(e => e.Name).IsUnique();
         });
 
         modelBuilder.Entity<User>(entity =>

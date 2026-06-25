@@ -6,6 +6,7 @@ public class Order
     public string CustomerInfo { get; set; } = "{}";
     public decimal TotalPrice { get; set; }
     public string Status { get; set; } = "Pending";
+    public string PaymentStatus { get; set; } = "Pending";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public List<OrderItem> Items { get; set; } = new();

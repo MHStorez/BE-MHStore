@@ -84,8 +84,8 @@ public static class DevelopmentDataSeeder
     {
         var categories = new[]
         {
-            new Category { Id = MainCategoryId, Name = "Món chính", Slug = "mon-chinh" },
-            new Category { Id = SnackCategoryId, Name = "Ăn vặt", Slug = "an-vat" }
+            new Category { Id = MainCategoryId, Name = "Món chính", Slug = "mon-chinh", Status = "Active" },
+            new Category { Id = SnackCategoryId, Name = "Ăn vặt", Slug = "an-vat", Status = "Active" }
         };
 
         foreach (var category in categories)
@@ -100,6 +100,7 @@ public static class DevelopmentDataSeeder
 
             existingCategory.Name = category.Name;
             existingCategory.Slug = category.Slug;
+            existingCategory.Status = category.Status;
         }
     }
 
@@ -114,7 +115,7 @@ public static class DevelopmentDataSeeder
                 Description = "Gói đông lạnh, chiên nhanh là giòn.",
                 Price = 120000,
                 ImageUrl = "https://images.unsplash.com/photo-1604908177522-0403f218842b?auto=format&fit=crop&w=900&q=80",
-                Category = "Món chính",
+                CategoryId = MainCategoryId,
                 IsAvailable = true
             },
             new Product
@@ -124,7 +125,7 @@ public static class DevelopmentDataSeeder
                 Description = "Hộp tiện lợi cho bữa ăn vặt tại nhà.",
                 Price = 65000,
                 ImageUrl = "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=80",
-                Category = "Ăn vặt",
+                CategoryId = SnackCategoryId,
                 IsAvailable = true
             },
             new Product
@@ -134,7 +135,7 @@ public static class DevelopmentDataSeeder
                 Description = "Đóng gói sẵn, phù hợp chiên hoặc thả lẩu.",
                 Price = 45000,
                 ImageUrl = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80",
-                Category = "Ăn vặt",
+                CategoryId = SnackCategoryId,
                 IsAvailable = true
             }
         };
@@ -153,7 +154,7 @@ public static class DevelopmentDataSeeder
             existingProduct.Description = product.Description;
             existingProduct.Price = product.Price;
             existingProduct.ImageUrl = product.ImageUrl;
-            existingProduct.Category = product.Category;
+            existingProduct.CategoryId = product.CategoryId;
             existingProduct.IsAvailable = product.IsAvailable;
         }
     }
@@ -163,6 +164,7 @@ public static class DevelopmentDataSeeder
         await SeedOrderAsync(
             context,
             PendingOrderId,
+            "Pending",
             "Pending",
             DateTime.UtcNow.AddHours(-2),
             new OrderCustomerInfo
@@ -181,6 +183,7 @@ public static class DevelopmentDataSeeder
             context,
             CompletedOrderId,
             "Completed",
+            "Paid",
             DateTime.UtcNow.AddDays(-1).AddHours(3),
             new OrderCustomerInfo
             {
@@ -199,7 +202,7 @@ public static class DevelopmentDataSeeder
                 OrderId = CompletedOrderId,
                 TransactionId = "SEED-SEPAY-0001",
                 Amount = 250000,
-                Status = "Completed",
+                Status = "Paid",
                 RawData = "Seed payment log",
                 CreatedAt = DateTime.UtcNow.AddDays(-1).AddHours(3)
             });
@@ -209,6 +212,7 @@ public static class DevelopmentDataSeeder
         AppDbContext context,
         Guid orderId,
         string status,
+        string paymentStatus,
         DateTime createdAt,
         OrderCustomerInfo customer,
         IReadOnlyCollection<SeedOrderItem> items,
@@ -224,6 +228,7 @@ public static class DevelopmentDataSeeder
             Id = orderId,
             CustomerInfo = JsonSerializer.Serialize(customer, JsonOptions),
             Status = status,
+            PaymentStatus = paymentStatus,
             CreatedAt = createdAt,
             TotalPrice = items.Sum(item => item.UnitPrice * item.Quantity),
             Items = items.Select(item => new OrderItem
