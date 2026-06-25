@@ -11,7 +11,7 @@ namespace MHStore.Services.AccountService;
 
 public class Service : IService
 {
-    private static readonly HashSet<string> AllowedRoles = ["Admin", "Customer"];
+    private const string CustomerRole = "Customer";
     private readonly AppDbContext _context;
     private readonly JwtOptions _jwtOptions;
 
@@ -35,14 +35,13 @@ public class Service : IService
             throw new ArgumentException("Username already exists.");
         }
 
-        var role = NormalizeRole(request.Role);
         var user = new User
         {
             Id = Guid.NewGuid(),
             Username = username,
             PasswordHash = PasswordHasher.Hash(request.Password),
             FullName = request.FullName.Trim(),
-            Role = role,
+            Role = CustomerRole,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -136,18 +135,6 @@ public class Service : IService
         {
             throw new ArgumentException("Password must be at least 6 characters.");
         }
-    }
-
-    private static string NormalizeRole(string role)
-    {
-        var normalizedRole = string.IsNullOrWhiteSpace(role) ? "Customer" : role.Trim();
-
-        if (!AllowedRoles.Contains(normalizedRole))
-        {
-            throw new ArgumentException("Role must be Admin or Customer.");
-        }
-
-        return normalizedRole;
     }
 
 }

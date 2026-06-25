@@ -1,7 +1,9 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MHStore.Repositories.Data;
+using MHStore.Repositories.Entities;
 
 namespace MHStore.Services.PaymentService;
 
@@ -32,6 +34,16 @@ public class Service : IService
         if (order.TotalPrice <= 0)
         {
             throw new ArgumentException("Order total must be greater than zero.");
+        }
+
+        if (order.PaymentStatus == "Failed")
+        {
+            throw new ArgumentException("Failed payment orders cannot create a new payment request.");
+        }
+
+        if (order.Status == "Completed")
+        {
+            throw new ArgumentException("Completed orders cannot create a new payment request.");
         }
 
         var content = BuildTransferContent(order.Id);
@@ -91,9 +103,23 @@ public class Service : IService
             };
         }
 
+        if (order.Status == "Completed")
+        {
+            await AddPaymentLogAsync(order, request, "Ignored");
+            await _context.SaveChangesAsync();
+
+            return new SePayWebhookResponse
+            {
+                OrderId = order.Id,
+                Success = true,
+                Message = "Order was already completed."
+            };
+        }
+
         if (request.TransferAmount < order.TotalPrice)
         {
-            order.Status = "PaymentFailed";
+            order.PaymentStatus = "Failed";
+            await AddPaymentLogAsync(order, request, "Failed");
             await _context.SaveChangesAsync();
 
             return new SePayWebhookResponse
@@ -104,15 +130,40 @@ public class Service : IService
             };
         }
 
-        order.Status = "Completed";
+        order.PaymentStatus = "Paid";
+        order.Status = "Processing";
+        await AddPaymentLogAsync(order, request, "Paid");
         await _context.SaveChangesAsync();
 
         return new SePayWebhookResponse
         {
             OrderId = order.Id,
             Success = true,
-            Message = "Payment completed."
+            Message = "Payment completed. Order is ready for admin completion."
         };
+    }
+
+    private async Task AddPaymentLogAsync(Order order, SePayWebhookRequest request, string status)
+    {
+        var transactionId = string.IsNullOrWhiteSpace(request.ReferenceCode)
+            ? request.Id.ToString(CultureInfo.InvariantCulture)
+            : request.ReferenceCode.Trim();
+
+        if (await _context.PaymentLogs.AnyAsync(log => log.TransactionId == transactionId))
+        {
+            return;
+        }
+
+        await _context.PaymentLogs.AddAsync(new PaymentLog
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            TransactionId = transactionId,
+            Amount = request.TransferAmount,
+            Status = status,
+            RawData = JsonSerializer.Serialize(request),
+            CreatedAt = DateTime.UtcNow
+        });
     }
 
     private void EnsureConfigured()

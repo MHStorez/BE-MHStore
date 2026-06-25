@@ -13,8 +13,11 @@ using OrderServiceImplementation = MHStore.Services.OrderService.Service;
 using MHStore.Services.PaymentService;
 using PaymentServiceInterface = MHStore.Services.PaymentService.IService;
 using PaymentServiceImplementation = MHStore.Services.PaymentService.Service;
+using MHStore.API;
 using ProductServiceInterface = MHStore.Services.ProductService.IService;
 using ProductServiceImplementation = MHStore.Services.ProductService.Service;
+using CategoryServiceInterface = MHStore.Services.CategoryService.IService;
+using CategoryServiceImplementation = MHStore.Services.CategoryService.Service;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,6 +53,7 @@ builder.Services
 builder.Services.AddScoped<AdminStatsServiceInterface, AdminStatsServiceImplementation>();
 builder.Services.AddScoped<AccountServiceInterface, AccountServiceImplementation>();
 builder.Services.AddScoped<ProductServiceInterface, ProductServiceImplementation>();
+builder.Services.AddScoped<CategoryServiceInterface, CategoryServiceImplementation>();
 builder.Services.AddScoped<OrderServiceInterface, OrderServiceImplementation>();
 builder.Services.AddScoped<PaymentServiceInterface, PaymentServiceImplementation>();
 
@@ -85,6 +89,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowAll");
+app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -97,7 +102,8 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     try 
     {
-        context.Database.Migrate();
+        await context.Database.MigrateAsync();
+        await DevelopmentDataSeeder.SeedAsync(context, app.Configuration, app.Environment);
     }
     catch (Exception ex)
     {
