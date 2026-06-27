@@ -20,6 +20,7 @@ public class Service : IService
 
     public async Task<CreatePaymentResponse> CreatePaymentAsync(CreatePaymentRequest request)
     {
+        Validate(request);
         EnsureConfigured();
 
         var order = await _context.Orders
@@ -71,12 +72,30 @@ public class Service : IService
             };
         }
 
+        if (request == null)
+        {
+            return new SePayWebhookResponse
+            {
+                Success = false,
+                Message = "Webhook payload is required."
+            };
+        }
+
         if (!string.Equals(request.TransferType, "in", StringComparison.OrdinalIgnoreCase))
         {
             return new SePayWebhookResponse
             {
                 Success = true,
                 Message = "Ignored non-incoming transaction."
+            };
+        }
+
+        if (request.TransferAmount <= 0)
+        {
+            return new SePayWebhookResponse
+            {
+                Success = false,
+                Message = "Transfer amount must be greater than zero."
             };
         }
 
@@ -141,6 +160,19 @@ public class Service : IService
             Success = true,
             Message = "Payment completed. Order is ready for admin completion."
         };
+    }
+
+    private static void Validate(CreatePaymentRequest request)
+    {
+        if (request == null)
+        {
+            throw new ArgumentException("Payment request is required.");
+        }
+
+        if (request.OrderId == Guid.Empty)
+        {
+            throw new ArgumentException("Order id is required.");
+        }
     }
 
     private async Task AddPaymentLogAsync(Order order, SePayWebhookRequest request, string status)

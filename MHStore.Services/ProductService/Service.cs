@@ -190,6 +190,11 @@ public class Service : IService
 
     private static void Validate(Request request)
     {
+        if (request == null)
+        {
+            throw new ArgumentException("Product request is required.");
+        }
+
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             throw new ArgumentException("Product name is required.");

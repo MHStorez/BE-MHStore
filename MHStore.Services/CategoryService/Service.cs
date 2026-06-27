@@ -31,7 +31,12 @@ public class Service : IService
 
     public async Task<Response> CreateAsync(Request request)
     {
-        var name = request.Name.Trim();
+        if (request == null)
+        {
+            throw new ArgumentException("Category request is required.");
+        }
+
+        var name = request.Name?.Trim() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(name))
         {

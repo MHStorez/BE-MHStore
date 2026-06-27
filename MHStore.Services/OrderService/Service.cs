@@ -47,10 +47,7 @@ public class Service : IService
 
     public async Task<Response> CreateDirectAsync(DirectBuyRequest request)
     {
-        if (request.Quantity <= 0)
-        {
-            throw new ArgumentException("Quantity must be greater than zero.");
-        }
+        Validate(request);
 
         return await CreateOrderAsync(
             request.CustomerInfo,
@@ -63,7 +60,7 @@ public class Service : IService
 
     public async Task<Response?> UpdateStatusAsync(Guid id, StatusRequest request)
     {
-        var status = request.Status.Trim();
+        var status = Validate(request);
 
         if (!AllowedStatuses.Contains(status))
         {
@@ -174,12 +171,81 @@ public class Service : IService
 
     private static void Validate(Request request)
     {
-        if (request.Items.Count == 0)
+        if (request == null)
+        {
+            throw new ArgumentException("Order request is required.");
+        }
+
+        ValidateCustomerInfo(request.CustomerInfo);
+        ValidateOrderItems(request.Items);
+    }
+
+    private static void Validate(DirectBuyRequest request)
+    {
+        if (request == null)
+        {
+            throw new ArgumentException("Order request is required.");
+        }
+
+        ValidateCustomerInfo(request.CustomerInfo);
+
+        if (!Guid.TryParse(request.ProductId, out _))
+        {
+            throw new ArgumentException("Every order item must have a valid product id.");
+        }
+
+        if (request.Quantity <= 0)
+        {
+            throw new ArgumentException("Quantity must be greater than zero.");
+        }
+    }
+
+    private static string Validate(StatusRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Status))
+        {
+            throw new ArgumentException("Order status is required.");
+        }
+
+        return request.Status.Trim();
+    }
+
+    private static void ValidateCustomerInfo(CustomerInfoRequest customerInfo)
+    {
+        if (customerInfo == null)
+        {
+            throw new ArgumentException("Customer information is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(customerInfo.Name))
+        {
+            throw new ArgumentException("Customer name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(customerInfo.Phone))
+        {
+            throw new ArgumentException("Customer phone is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(customerInfo.Address))
+        {
+            throw new ArgumentException("Customer address is required.");
+        }
+    }
+
+    private static void ValidateOrderItems(List<OrderItemRequest> items)
+    {
+        if (items == null || items.Count == 0)
         {
             throw new ArgumentException("Order must contain at least one item.");
         }
 
-        if (request.Items.Any(item => item.Quantity <= 0))
+        if (items.Any(item => item == null || !Guid.TryParse(item.ProductId, out _)))
+        {
+            throw new ArgumentException("Every order item must have a valid product id.");
+        }
+
+        if (items.Any(item => item.Quantity <= 0))
         {
             throw new ArgumentException("Every order item quantity must be greater than zero.");
         }
