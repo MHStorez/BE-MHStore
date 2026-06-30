@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<Order> Orders { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Category> Categories { get; set; }
+    public DbSet<ProductImage> ProductImages { get; set; }
     public DbSet<OrderItem> OrderItems { get; set; }
     public DbSet<PaymentLog> PaymentLogs { get; set; }
 
@@ -29,9 +30,28 @@ public class AppDbContext : DbContext
             entity.Property(e => e.Description).HasColumnName("description");
             entity.Property(e => e.Price).HasColumnName("price").HasPrecision(18, 2);
             entity.Property(e => e.ImageUrl).HasColumnName("image_url");
+            entity.Property(e => e.Stock).HasColumnName("stock");
             entity.Property(e => e.CategoryId).HasColumnName("category_id");
             entity.Property(e => e.IsAvailable).HasColumnName("is_available");
-            entity.HasOne(e => e.Category).WithMany(c => c.Products).HasForeignKey(e => e.CategoryId);
+            entity.HasOne(e => e.Category)
+                .WithMany(c => c.Products)
+                .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductImage>(entity =>
+        {
+            entity.ToTable("ProductImages");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.ImageUrl).HasColumnName("image_url").IsRequired();
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.HasIndex(e => e.ProductId);
+            entity.HasOne(e => e.Product)
+                .WithMany(p => p.Images)
+                .HasForeignKey(e => e.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Order>(entity =>
@@ -39,11 +59,28 @@ public class AppDbContext : DbContext
             entity.ToTable("Orders");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.OrderCode).HasColumnName("order_code").IsRequired().HasMaxLength(32);
             entity.Property(e => e.CustomerInfo).HasColumnName("customer_info").HasColumnType("jsonb");
             entity.Property(e => e.TotalPrice).HasColumnName("total_price").HasPrecision(18, 2);
-            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50);
-            entity.Property(e => e.PaymentStatus).HasColumnName("payment_status").HasMaxLength(50);
+            entity.Property(e => e.OrderStatus).HasColumnName("order_status").HasConversion<string>().HasMaxLength(50);
+            entity.Property(e => e.PaymentStatus).HasColumnName("payment_status").HasConversion<string>().HasMaxLength(50);
+            entity.Property(e => e.OrderChannel).HasColumnName("order_channel").HasConversion<string>().HasMaxLength(50);
+            entity.Property(e => e.PaymentMethod).HasColumnName("payment_method").HasConversion<string>().HasMaxLength(50);
+            entity.Property(e => e.ReceiverName).HasColumnName("receiver_name").HasMaxLength(200);
+            entity.Property(e => e.ReceiverPhone).HasColumnName("receiver_phone").HasMaxLength(40);
+            entity.Property(e => e.DeliveryAddress).HasColumnName("delivery_address").HasMaxLength(500);
+            entity.Property(e => e.Latitude).HasColumnName("latitude").HasPrecision(10, 7);
+            entity.Property(e => e.Longitude).HasColumnName("longitude").HasPrecision(10, 7);
+            entity.Property(e => e.AddressNote).HasColumnName("address_note").HasMaxLength(500);
+            entity.Property(e => e.AddressReferenceId).HasColumnName("address_reference_id").HasMaxLength(120);
+            entity.Property(e => e.StockReleased).HasColumnName("stock_released");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(e => e.OrderCode).IsUnique();
+            entity.HasIndex(e => e.OrderStatus);
+            entity.HasIndex(e => e.PaymentStatus);
+            entity.HasIndex(e => e.OrderChannel);
+            entity.HasIndex(e => e.PaymentMethod);
+            entity.HasIndex(e => e.CreatedAt);
         });
 
         modelBuilder.Entity<OrderItem>(entity =>
@@ -58,7 +95,10 @@ public class AppDbContext : DbContext
         {
             entity.ToTable("PaymentLogs");
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.TransactionId).IsRequired().HasMaxLength(120);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
             entity.Property(e => e.Amount).HasPrecision(18, 2);
+            entity.HasIndex(e => e.TransactionId).IsUnique();
             entity.HasOne(e => e.Order).WithMany(o => o.PaymentLogs).HasForeignKey(e => e.OrderId);
         });
 

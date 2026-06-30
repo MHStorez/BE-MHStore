@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using MHStore.Repositories.Data;
 using MHStore.Repositories.Entities;
+using MHStore.Repositories.Enums;
 using MHStore.Services.AccountService;
 using OrderCustomerInfo = MHStore.Services.OrderService.CustomerInfoResponse;
 
@@ -115,6 +116,7 @@ public static class DevelopmentDataSeeder
                 Description = "Gói đông lạnh, chiên nhanh là giòn.",
                 Price = 120000,
                 ImageUrl = "https://images.unsplash.com/photo-1604908177522-0403f218842b?auto=format&fit=crop&w=900&q=80",
+                Stock = 30,
                 CategoryId = MainCategoryId,
                 IsAvailable = true
             },
@@ -125,6 +127,7 @@ public static class DevelopmentDataSeeder
                 Description = "Hộp tiện lợi cho bữa ăn vặt tại nhà.",
                 Price = 65000,
                 ImageUrl = "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=80",
+                Stock = 40,
                 CategoryId = SnackCategoryId,
                 IsAvailable = true
             },
@@ -135,6 +138,7 @@ public static class DevelopmentDataSeeder
                 Description = "Đóng gói sẵn, phù hợp chiên hoặc thả lẩu.",
                 Price = 45000,
                 ImageUrl = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80",
+                Stock = 50,
                 CategoryId = SnackCategoryId,
                 IsAvailable = true
             }
@@ -154,8 +158,24 @@ public static class DevelopmentDataSeeder
             existingProduct.Description = product.Description;
             existingProduct.Price = product.Price;
             existingProduct.ImageUrl = product.ImageUrl;
+            existingProduct.Stock = product.Stock;
             existingProduct.CategoryId = product.CategoryId;
             existingProduct.IsAvailable = product.IsAvailable;
+        }
+
+        foreach (var product in products)
+        {
+            if (!string.IsNullOrWhiteSpace(product.ImageUrl) &&
+                !await context.ProductImages.AnyAsync(image => image.ProductId == product.Id))
+            {
+                context.ProductImages.Add(new ProductImage
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = product.Id,
+                    ImageUrl = product.ImageUrl,
+                    SortOrder = 0
+                });
+            }
         }
     }
 
@@ -226,9 +246,19 @@ public static class DevelopmentDataSeeder
         var order = new Order
         {
             Id = orderId,
+            OrderCode = $"MH{createdAt:yyMMdd}{orderId:N}"[..16].ToUpperInvariant(),
             CustomerInfo = JsonSerializer.Serialize(customer, JsonOptions),
-            Status = status,
-            PaymentStatus = paymentStatus,
+            OrderStatus = Enum.Parse<OrderStatus>(status == "Pending" ? "PendingConfirmation" : status),
+            PaymentStatus = Enum.Parse<PaymentStatus>(paymentStatus),
+            OrderChannel = OrderChannel.Website,
+            PaymentMethod = PaymentMethod.Online,
+            ReceiverName = customer.Name,
+            ReceiverPhone = customer.Phone,
+            DeliveryAddress = customer.Address,
+            Latitude = customer.Latitude,
+            Longitude = customer.Longitude,
+            AddressNote = customer.Note,
+            AddressReferenceId = customer.AddressReferenceId,
             CreatedAt = createdAt,
             TotalPrice = items.Sum(item => item.UnitPrice * item.Quantity),
             Items = items.Select(item => new OrderItem
