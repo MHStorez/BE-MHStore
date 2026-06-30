@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using MHStore.Repositories.Data;
 using System.Text;
 using DotNetEnv;
@@ -39,6 +40,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("JwtOptions"));
 builder.Services.Configure<SePayOptions>(builder.Configuration.GetSection("SePay"));
 builder.Services.Configure<VietMapOptions>(builder.Configuration.GetSection("VietMap"));
+
 var jwtOptions = builder.Configuration.GetSection("JwtOptions").Get<JwtOptions>() ?? new JwtOptions();
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey));
 
@@ -59,7 +61,7 @@ builder.Services
         };
     });
 
-// Tầng Service gọi trực tiếp AppDbContext
+// Services
 builder.Services.AddScoped<AdminStatsServiceInterface, AdminStatsServiceImplementation>();
 builder.Services.AddScoped<AccountServiceInterface, AccountServiceImplementation>();
 builder.Services.AddScoped<ProductServiceInterface, ProductServiceImplementation>();
@@ -70,37 +72,50 @@ builder.Services.AddHttpClient<AddressServiceInterface, AddressServiceImplementa
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll",
-        builder =>
-        {
-            builder.AllowAnyOrigin()
-                   .AllowAnyMethod()
-                   .AllowAnyHeader();
-        });
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
 });
 
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen(options =>
 {
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "MHStore.API",
+        Version = "v1"
+    });
+
     options.CustomSchemaIds(type => type.FullName?.Replace('+', '.') ?? type.Name);
 });
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Swagger (bật cả Production)
+app.UseSwagger();
+
+app.UseSwaggerUI(c =>
 {
-    app.UseSwaggerUI();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "MHStore.API v1");
+});
+
+// Root endpoint để test Render
+app.MapGet("/", () => "MHStore Backend is running");
 
 /*
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
+*/
 
 app.UseCors("AllowAll");
-app.UseStaticFiles();*/
+// app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -112,7 +127,7 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    try 
+    try
     {
         await context.Database.MigrateAsync();
         await DevelopmentDataSeeder.SeedAsync(context, app.Configuration, app.Environment);
@@ -121,6 +136,7 @@ using (var scope = app.Services.CreateScope())
     {
         Console.WriteLine($"Lỗi khi cập nhật Database: {ex.Message}");
     }
-}*/
+}
+*/
 
 app.Run();
