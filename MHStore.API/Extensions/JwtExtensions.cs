@@ -1,11 +1,10 @@
 using System.Security.Claims;
 using System.Text;
+using MHStore.Services.AccountService;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using TetPee.service.JwtService;
 
-
-namespace TetPee.Api.Extensions;
+namespace MHStore.API.Extensions;
 
 public static class JwtExtensions
 {
@@ -47,17 +46,6 @@ public static class JwtExtensions
                 policy.RequireRole("Admin"));
             // [Authorize(Policy = JwtExtensions.AdminPolicy)]
         
-            options.AddPolicy(SellerPolicy, policy =>
-                policy.RequireRole("Seller"));
-            // [Authorize(Policy = JwtExtensions.SellerPolicy)]
-        
-            options.AddPolicy(UserPolicy, policy =>
-                policy.RequireRole("User"));
-        
-            options.AddPolicy(SellerOrAdminPolicy, policy =>
-                policy.RequireRole("Seller", "Admin"));
-        
-            // [Authorize(Policy = JwtExtensions.SellerOrAdminPolicy)]
         });
     }
 }

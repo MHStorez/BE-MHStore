@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using MHStore.Repositories.Data;
 using System.Text;
+using DotNetEnv;
 using AdminStatsServiceInterface = MHStore.Services.AdminStatsService.IService;
 using AdminStatsServiceImplementation = MHStore.Services.AdminStatsService.Service;
 using AccountServiceInterface = MHStore.Services.AccountService.IService;
@@ -21,6 +22,11 @@ using ProductServiceInterface = MHStore.Services.ProductService.IService;
 using ProductServiceImplementation = MHStore.Services.ProductService.Service;
 using CategoryServiceInterface = MHStore.Services.CategoryService.IService;
 using CategoryServiceImplementation = MHStore.Services.CategoryService.Service;
+
+Env.Load();
+
+var aspnetCoreEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", aspnetCoreEnv);
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,23 +90,24 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+/*
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
 
 app.UseCors("AllowAll");
-app.UseStaticFiles();
+app.UseStaticFiles();*/
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
+/*
 // Tự động chạy Migration khi khởi động
 using (var scope = app.Services.CreateScope())
 {
@@ -114,6 +121,6 @@ using (var scope = app.Services.CreateScope())
     {
         Console.WriteLine($"Lỗi khi cập nhật Database: {ex.Message}");
     }
-}
+}*/
 
 app.Run();
