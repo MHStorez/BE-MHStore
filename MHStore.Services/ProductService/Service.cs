@@ -18,6 +18,7 @@ public class Service : IService
     {
         var query = _context.Products
             .Include(p => p.Category)
+            .Include(p => p.Images)
             .AsNoTracking();
 
         if (!includeUnavailable)
@@ -55,6 +56,7 @@ public class Service : IService
     {
         var query = _context.Products
             .Include(p => p.Category)
+            .Include(p => p.Images)
             .AsNoTracking();
 
         if (!includeUnavailable)
@@ -71,6 +73,7 @@ public class Service : IService
     {
         Validate(request);
         var category = await ResolveCategoryAsync(request);
+        var imageUrls = NormalizeImageUrls(request);
 
         var product = new Product
         {
@@ -78,11 +81,19 @@ public class Service : IService
             Name = request.Name.Trim(),
             Description = request.Description?.Trim(),
             Price = request.Price,
-            ImageUrl = request.ImageUrl?.Trim(),
+            ImageUrl = imageUrls.FirstOrDefault(),
+            Stock = request.Stock,
             CategoryId = category.Id,
             Category = category,
             IsAvailable = request.IsAvailable
         };
+        product.Images = imageUrls.Select((imageUrl, index) => new ProductImage
+        {
+            Id = Guid.NewGuid(),
+            ProductId = product.Id,
+            ImageUrl = imageUrl,
+            SortOrder = index
+        }).ToList();
 
         await _context.Products.AddAsync(product);
         await _context.SaveChangesAsync();
@@ -96,6 +107,7 @@ public class Service : IService
 
         var product = await _context.Products
             .Include(p => p.Category)
+            .Include(p => p.Images)
             .FirstOrDefaultAsync(p => p.Id == id);
 
         if (product == null)
@@ -104,14 +116,25 @@ public class Service : IService
         }
 
         var category = await ResolveCategoryAsync(request);
+        var imageUrls = NormalizeImageUrls(request);
 
         product.Name = request.Name.Trim();
         product.Description = request.Description?.Trim();
         product.Price = request.Price;
-        product.ImageUrl = request.ImageUrl?.Trim();
+        product.ImageUrl = imageUrls.FirstOrDefault();
+        product.Stock = request.Stock;
         product.CategoryId = category.Id;
         product.Category = category;
         product.IsAvailable = request.IsAvailable;
+
+        _context.ProductImages.RemoveRange(product.Images);
+        product.Images = imageUrls.Select((imageUrl, index) => new ProductImage
+        {
+            Id = Guid.NewGuid(),
+            ProductId = product.Id,
+            ImageUrl = imageUrl,
+            SortOrder = index
+        }).ToList();
 
         await _context.SaveChangesAsync();
 
@@ -205,6 +228,11 @@ public class Service : IService
             throw new ArgumentException("Product price must be greater than zero.");
         }
 
+        if (request.Stock < 0)
+        {
+            throw new ArgumentException("Product stock cannot be negative.");
+        }
+
         if (request.CategoryId == null && string.IsNullOrWhiteSpace(request.Category) && string.IsNullOrWhiteSpace(request.NewCategoryName))
         {
             throw new ArgumentException("Product category is required.");
@@ -213,17 +241,42 @@ public class Service : IService
 
     private static Response ToResponse(Product product)
     {
+        var imageUrls = product.Images
+            .OrderBy(image => image.SortOrder)
+            .Select(image => image.ImageUrl)
+            .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
+            .ToList();
+
+        if (imageUrls.Count == 0 && !string.IsNullOrWhiteSpace(product.ImageUrl))
+        {
+            imageUrls.Add(product.ImageUrl.Trim());
+        }
+
         return new Response
         {
             Id = product.Id,
             Name = product.Name,
             Description = product.Description,
             Price = product.Price,
-            ImageUrl = product.ImageUrl,
+            ImageUrl = imageUrls.FirstOrDefault(),
+            ImageUrls = imageUrls,
+            Stock = product.Stock,
             CategoryId = product.CategoryId,
             Category = product.Category?.Name ?? DefaultCategoryName,
             IsAvailable = product.IsAvailable
         };
+    }
+
+    private static List<string> NormalizeImageUrls(Request request)
+    {
+        var imageUrls = (request.ImageUrls ?? [])
+            .Concat(string.IsNullOrWhiteSpace(request.ImageUrl) ? [] : [request.ImageUrl])
+            .Select(imageUrl => imageUrl.Trim())
+            .Where(imageUrl => !string.IsNullOrWhiteSpace(imageUrl))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return imageUrls;
     }
 
     private static string ToSlug(string value)

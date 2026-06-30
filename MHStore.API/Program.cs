@@ -13,6 +13,9 @@ using OrderServiceImplementation = MHStore.Services.OrderService.Service;
 using MHStore.Services.PaymentService;
 using PaymentServiceInterface = MHStore.Services.PaymentService.IService;
 using PaymentServiceImplementation = MHStore.Services.PaymentService.Service;
+using VietMapOptions = MHStore.Services.AddressService.VietMapOptions;
+using AddressServiceInterface = MHStore.Services.AddressService.IService;
+using AddressServiceImplementation = MHStore.Services.AddressService.Service;
 using MHStore.API;
 using ProductServiceInterface = MHStore.Services.ProductService.IService;
 using ProductServiceImplementation = MHStore.Services.ProductService.Service;
@@ -29,6 +32,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("JwtOptions"));
 builder.Services.Configure<SePayOptions>(builder.Configuration.GetSection("SePay"));
+builder.Services.Configure<VietMapOptions>(builder.Configuration.GetSection("VietMap"));
 var jwtOptions = builder.Configuration.GetSection("JwtOptions").Get<JwtOptions>() ?? new JwtOptions();
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey));
 
@@ -56,6 +60,7 @@ builder.Services.AddScoped<ProductServiceInterface, ProductServiceImplementation
 builder.Services.AddScoped<CategoryServiceInterface, CategoryServiceImplementation>();
 builder.Services.AddScoped<OrderServiceInterface, OrderServiceImplementation>();
 builder.Services.AddScoped<PaymentServiceInterface, PaymentServiceImplementation>();
+builder.Services.AddHttpClient<AddressServiceInterface, AddressServiceImplementation>();
 
 builder.Services.AddCors(options =>
 {

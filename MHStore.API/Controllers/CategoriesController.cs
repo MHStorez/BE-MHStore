@@ -41,4 +41,41 @@ public class CategoriesController : ControllerBase
             return BadRequest(exception.Message);
         }
     }
+
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<CategoryResponse>> UpdateCategory(Guid id, CategoryRequest request)
+    {
+        try
+        {
+            var category = await _categoryService.UpdateAsync(id, request);
+
+            if (category == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(category);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> DeleteCategory(Guid id)
+    {
+        try
+        {
+            var isDeleted = await _categoryService.DeleteAsync(id);
+
+            return isDeleted ? NoContent() : NotFound();
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+    }
 }

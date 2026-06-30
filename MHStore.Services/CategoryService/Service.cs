@@ -31,34 +31,9 @@ public class Service : IService
 
     public async Task<Response> CreateAsync(Request request)
     {
-        if (request == null)
-        {
-            throw new ArgumentException("Category request is required.");
-        }
-
-        var name = request.Name?.Trim() ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException("Category name is required.");
-        }
-
-        var normalizedName = name.ToLower();
-        var existingCategory = await _context.Categories
-            .FirstOrDefaultAsync(category => category.Name.ToLower() == normalizedName);
-
-        if (existingCategory != null)
-        {
-            throw new ArgumentException("Category name already exists.");
-        }
-
-        var status = string.IsNullOrWhiteSpace(request.Status) ? "Active" : request.Status.Trim();
-
-        if (status != "Active" && status != "Inactive")
-        {
-            throw new ArgumentException("Category status must be Active or Inactive.");
-        }
-
+        var name = ValidateName(request);
+        await EnsureUniqueNameAsync(name);
+        var status = ValidateStatus(request.Status);
         var category = new Category
         {
             Id = Guid.NewGuid(),
@@ -71,6 +46,91 @@ public class Service : IService
         await _context.SaveChangesAsync();
 
         return ToResponse(category);
+    }
+
+    public async Task<Response?> UpdateAsync(Guid id, Request request)
+    {
+        var category = await _context.Categories.FirstOrDefaultAsync(item => item.Id == id);
+
+        if (category == null)
+        {
+            return null;
+        }
+
+        var name = ValidateName(request);
+        await EnsureUniqueNameAsync(name, id);
+        var status = ValidateStatus(request.Status);
+
+        category.Name = name;
+        category.Slug = ToSlug(name);
+        category.Status = status;
+
+        await _context.SaveChangesAsync();
+
+        return ToResponse(category);
+    }
+
+    public async Task<bool> DeleteAsync(Guid id)
+    {
+        var category = await _context.Categories
+            .Include(item => item.Products)
+            .FirstOrDefaultAsync(item => item.Id == id);
+
+        if (category == null)
+        {
+            return false;
+        }
+
+        if (category.Products.Count > 0)
+        {
+            throw new ArgumentException("Category has products and cannot be deleted.");
+        }
+
+        _context.Categories.Remove(category);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    private static string ValidateName(Request request)
+    {
+        if (request == null)
+        {
+            throw new ArgumentException("Category request is required.");
+        }
+
+        var name = request.Name?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Category name is required.");
+        }
+
+        return name;
+    }
+
+    private static string ValidateStatus(string? value)
+    {
+        var status = string.IsNullOrWhiteSpace(value) ? "Active" : value.Trim();
+
+        if (status != "Active" && status != "Inactive")
+        {
+            throw new ArgumentException("Category status must be Active or Inactive.");
+        }
+
+        return status;
+    }
+
+    private async Task EnsureUniqueNameAsync(string name, Guid? currentCategoryId = null)
+    {
+        var normalizedName = name.ToLower();
+        var existingCategory = await _context.Categories
+            .FirstOrDefaultAsync(category => category.Name.ToLower() == normalizedName);
+
+        if (existingCategory != null && existingCategory.Id != currentCategoryId)
+        {
+            throw new ArgumentException("Category name already exists.");
+        }
     }
 
     private static Response ToResponse(Category category)

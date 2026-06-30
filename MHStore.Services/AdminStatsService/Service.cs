@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using MHStore.Repositories.Data;
+using MHStore.Repositories.Enums;
 using MHStore.Services.OrderService;
 
 namespace MHStore.Services.AdminStatsService;
@@ -23,32 +24,32 @@ public class Service : IService
         var todayRevenue = await _context.Orders
             .AsNoTracking()
             .Where(order =>
-                order.Status == "Completed" &&
+                order.OrderStatus == OrderStatus.Completed &&
                 order.CreatedAt >= today &&
                 order.CreatedAt < tomorrow)
             .SumAsync(order => order.TotalPrice);
         var newOrderCount = await _context.Orders
             .AsNoTracking()
             .CountAsync(order =>
-                order.Status == "Pending" &&
+                order.OrderStatus == OrderStatus.PendingConfirmation &&
                 order.CreatedAt >= today &&
                 order.CreatedAt < tomorrow);
         var pendingOrderCount = await _context.Orders
             .AsNoTracking()
-            .CountAsync(order => order.Status == "Pending");
+            .CountAsync(order => order.OrderStatus == OrderStatus.PendingConfirmation);
         var completedOrderCount = await _context.Orders
             .AsNoTracking()
-            .CountAsync(order => order.Status == "Completed");
+            .CountAsync(order => order.OrderStatus == OrderStatus.Completed);
         var totalOrderCount = await _context.Orders
             .AsNoTracking()
             .CountAsync();
         var totalRevenue = await _context.Orders
             .AsNoTracking()
-            .Where(order => order.Status == "Completed")
+            .Where(order => order.OrderStatus == OrderStatus.Completed)
             .SumAsync(order => order.TotalPrice);
         var topProducts = await _context.OrderItems
             .AsNoTracking()
-            .Where(item => item.Order.Status == "Completed")
+            .Where(item => item.Order.OrderStatus == OrderStatus.Completed)
             .GroupBy(item => new { item.ProductId, item.ProductName })
             .Select(group => new BestSellingProductResponse
             {
@@ -63,10 +64,12 @@ public class Service : IService
             .ToListAsync();
         var completedCustomerOrders = await _context.Orders
             .AsNoTracking()
-            .Where(order => order.Status == "Completed")
+            .Where(order => order.OrderStatus == OrderStatus.Completed)
             .Select(order => new
             {
                 order.CustomerInfo,
+                order.ReceiverName,
+                order.ReceiverPhone,
                 order.TotalPrice,
                 order.CreatedAt
             })
@@ -75,11 +78,22 @@ public class Service : IService
             .Select(order => new
             {
                 Customer = DeserializeCustomer(order.CustomerInfo),
+                order.ReceiverName,
+                order.ReceiverPhone,
                 order.TotalPrice,
                 order.CreatedAt
             })
-            .Where(order => order.Customer != null)
-            .GroupBy(order => NormalizePhone(order.Customer!.Phone))
+            .Select(order => new
+            {
+                Customer = new CustomerInfoResponse
+                {
+                    Name = string.IsNullOrWhiteSpace(order.ReceiverName) ? order.Customer?.Name ?? string.Empty : order.ReceiverName,
+                    Phone = string.IsNullOrWhiteSpace(order.ReceiverPhone) ? order.Customer?.Phone ?? string.Empty : order.ReceiverPhone
+                },
+                order.TotalPrice,
+                order.CreatedAt
+            })
+            .GroupBy(order => NormalizePhone(order.Customer.Phone))
             .Where(group => !string.IsNullOrWhiteSpace(group.Key))
             .Select(group =>
             {
@@ -87,7 +101,7 @@ public class Service : IService
 
                 return new CustomerSummaryResponse
                 {
-                    Name = string.IsNullOrWhiteSpace(latestOrder.Customer!.Name)
+                    Name = string.IsNullOrWhiteSpace(latestOrder.Customer.Name)
                         ? "Khách chưa nhập tên"
                         : latestOrder.Customer.Name.Trim(),
                     Phone = latestOrder.Customer.Phone.Trim(),
@@ -134,5 +148,4 @@ public class Service : IService
 
     private static string NormalizePhone(string phone) =>
         new(phone.Where(char.IsDigit).ToArray());
-
 }

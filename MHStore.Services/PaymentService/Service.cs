@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MHStore.Repositories.Data;
 using MHStore.Repositories.Entities;
+using MHStore.Repositories.Enums;
 
 namespace MHStore.Services.PaymentService;
 
@@ -37,17 +38,22 @@ public class Service : IService
             throw new ArgumentException("Order total must be greater than zero.");
         }
 
-        if (order.PaymentStatus == "Failed")
+        if (order.OrderChannel != OrderChannel.Website || order.PaymentMethod != PaymentMethod.Online)
         {
-            throw new ArgumentException("Failed payment orders cannot create a new payment request.");
+            throw new ArgumentException("Only website online orders can create a SePay payment request.");
         }
 
-        if (order.Status == "Completed")
+        if (order.PaymentStatus != PaymentStatus.Pending)
         {
-            throw new ArgumentException("Completed orders cannot create a new payment request.");
+            throw new ArgumentException("Only pending online payments can create a new payment request.");
         }
 
-        var content = BuildTransferContent(order.Id);
+        if (order.OrderStatus is OrderStatus.Cancelled or OrderStatus.Completed)
+        {
+            throw new ArgumentException("Cancelled or completed orders cannot create a new payment request.");
+        }
+
+        var content = BuildTransferContent(order);
 
         return new CreatePaymentResponse
         {
@@ -65,43 +71,40 @@ public class Service : IService
     {
         if (!IsAuthorized(apiKey))
         {
-            return new SePayWebhookResponse
-            {
-                Success = false,
-                Message = "Unauthorized webhook."
-            };
+            return new SePayWebhookResponse { Success = false, Message = "Unauthorized webhook." };
         }
 
         if (request == null)
         {
-            return new SePayWebhookResponse
-            {
-                Success = false,
-                Message = "Webhook payload is required."
-            };
+            return new SePayWebhookResponse { Success = false, Message = "Webhook payload is required." };
         }
 
         if (!string.Equals(request.TransferType, "in", StringComparison.OrdinalIgnoreCase))
         {
-            return new SePayWebhookResponse
-            {
-                Success = true,
-                Message = "Ignored non-incoming transaction."
-            };
+            return new SePayWebhookResponse { Success = true, Message = "Ignored non-incoming transaction." };
         }
 
         if (request.TransferAmount <= 0)
         {
+            return new SePayWebhookResponse { Success = false, Message = "Transfer amount must be greater than zero." };
+        }
+
+        var transactionId = GetTransactionId(request);
+        var duplicateLog = await _context.PaymentLogs.AsNoTracking().FirstOrDefaultAsync(log => log.TransactionId == transactionId);
+
+        if (duplicateLog != null)
+        {
             return new SePayWebhookResponse
             {
-                Success = false,
-                Message = "Transfer amount must be greater than zero."
+                OrderId = duplicateLog.OrderId,
+                Success = true,
+                Message = "Duplicate webhook ignored."
             };
         }
 
-        var orderId = ExtractOrderId(request.Code, request.Content, request.Description);
+        var order = await FindOrderFromWebhookAsync(request);
 
-        if (orderId == null)
+        if (order == null)
         {
             return new SePayWebhookResponse
             {
@@ -110,19 +113,7 @@ public class Service : IService
             };
         }
 
-        var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == orderId.Value);
-
-        if (order == null)
-        {
-            return new SePayWebhookResponse
-            {
-                OrderId = orderId,
-                Success = false,
-                Message = "Order was not found."
-            };
-        }
-
-        if (order.Status == "Completed")
+        if (order.OrderStatus is OrderStatus.Cancelled or OrderStatus.Completed)
         {
             await AddPaymentLogAsync(order, request, "Ignored");
             await _context.SaveChangesAsync();
@@ -131,13 +122,53 @@ public class Service : IService
             {
                 OrderId = order.Id,
                 Success = true,
-                Message = "Order was already completed."
+                Message = "Order cannot be updated by webhook in its current status."
+            };
+        }
+
+        if (order.OrderChannel != OrderChannel.Website || order.PaymentMethod != PaymentMethod.Online)
+        {
+            await AddPaymentLogAsync(order, request, "Ignored");
+            await _context.SaveChangesAsync();
+
+            return new SePayWebhookResponse
+            {
+                OrderId = order.Id,
+                Success = true,
+                Message = "Ignored payment for non-online order."
+            };
+        }
+
+        if (order.PaymentStatus == PaymentStatus.Paid)
+        {
+            await AddPaymentLogAsync(order, request, "Ignored");
+            await _context.SaveChangesAsync();
+
+            return new SePayWebhookResponse
+            {
+                OrderId = order.Id,
+                Success = true,
+                Message = "Order was already paid."
+            };
+        }
+
+        if (order.PaymentStatus != PaymentStatus.Pending ||
+            order.OrderStatus is not (OrderStatus.PendingConfirmation or OrderStatus.Confirmed))
+        {
+            await AddPaymentLogAsync(order, request, "Ignored");
+            await _context.SaveChangesAsync();
+
+            return new SePayWebhookResponse
+            {
+                OrderId = order.Id,
+                Success = false,
+                Message = "Order is not in a valid state for payment confirmation."
             };
         }
 
         if (request.TransferAmount < order.TotalPrice)
         {
-            order.PaymentStatus = "Failed";
+            order.PaymentStatus = PaymentStatus.Failed;
             await AddPaymentLogAsync(order, request, "Failed");
             await _context.SaveChangesAsync();
 
@@ -149,8 +180,8 @@ public class Service : IService
             };
         }
 
-        order.PaymentStatus = "Paid";
-        order.Status = "Processing";
+        order.PaymentStatus = PaymentStatus.Paid;
+        order.OrderStatus = OrderStatus.Confirmed;
         await AddPaymentLogAsync(order, request, "Paid");
         await _context.SaveChangesAsync();
 
@@ -158,7 +189,7 @@ public class Service : IService
         {
             OrderId = order.Id,
             Success = true,
-            Message = "Payment completed. Order is ready for admin completion."
+            Message = "Payment completed. Order is confirmed."
         };
     }
 
@@ -175,11 +206,24 @@ public class Service : IService
         }
     }
 
+    private async Task<Order?> FindOrderFromWebhookAsync(SePayWebhookRequest request)
+    {
+        var orderCode = ExtractOrderCode(request.Code, request.Content, request.Description);
+
+        if (!string.IsNullOrWhiteSpace(orderCode))
+        {
+            var byCode = await _context.Orders.FirstOrDefaultAsync(o => o.OrderCode == orderCode);
+            if (byCode != null) return byCode;
+        }
+
+        var orderId = ExtractOrderId(request.Code, request.Content, request.Description);
+
+        return orderId == null ? null : await _context.Orders.FirstOrDefaultAsync(o => o.Id == orderId.Value);
+    }
+
     private async Task AddPaymentLogAsync(Order order, SePayWebhookRequest request, string status)
     {
-        var transactionId = string.IsNullOrWhiteSpace(request.ReferenceCode)
-            ? request.Id.ToString(CultureInfo.InvariantCulture)
-            : request.ReferenceCode.Trim();
+        var transactionId = GetTransactionId(request);
 
         if (await _context.PaymentLogs.AnyAsync(log => log.TransactionId == transactionId))
         {
@@ -197,6 +241,11 @@ public class Service : IService
             CreatedAt = DateTime.UtcNow
         });
     }
+
+    private static string GetTransactionId(SePayWebhookRequest request) =>
+        string.IsNullOrWhiteSpace(request.ReferenceCode)
+            ? request.Id.ToString(CultureInfo.InvariantCulture)
+            : request.ReferenceCode.Trim();
 
     private void EnsureConfigured()
     {
@@ -226,9 +275,39 @@ public class Service : IService
         return $"https://qr.sepay.vn/img?acc={_options.AccountNumber}&bank={_options.BankCode}&amount={amountValue}&des={encodedContent}&template={_options.VietQrTemplate}";
     }
 
-    private string BuildTransferContent(Guid orderId)
+    private string BuildTransferContent(Order order)
     {
-        return $"{_options.ContentPrefix}{orderId:N}";
+        var reference = string.IsNullOrWhiteSpace(order.OrderCode) ? order.Id.ToString("N") : order.OrderCode;
+
+        return $"{_options.ContentPrefix}{reference}";
+    }
+
+    private string? ExtractOrderCode(params string[] values)
+    {
+        var prefix = _options.ContentPrefix.Trim();
+
+        foreach (var value in values.Where(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            var index = value.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+
+            if (index < 0)
+            {
+                continue;
+            }
+
+            var start = index + prefix.Length;
+            var chars = value[start..]
+                .TakeWhile(char.IsLetterOrDigit)
+                .ToArray();
+            var token = new string(chars).Trim();
+
+            if (token.Length is >= 8 and <= 32 && !Guid.TryParseExact(token, "N", out _))
+            {
+                return token.ToUpperInvariant();
+            }
+        }
+
+        return null;
     }
 
     private Guid? ExtractOrderId(params string[] values)
