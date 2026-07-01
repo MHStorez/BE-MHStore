@@ -72,11 +72,14 @@ builder.Services.AddHttpClient<AddressServiceInterface, AddressServiceImplementa
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        policy.WithOrigins(
+                "http://localhost:5173",
+                "https://fe-mhstore.vercel.app"
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader();
     });
 });
 
@@ -114,7 +117,7 @@ if (!app.Environment.IsDevelopment())
 }
 */
 
-app.UseCors("AllowAll");
+app.UseCors("AllowFrontend");
 // app.UseStaticFiles();
 
 app.UseAuthentication();
