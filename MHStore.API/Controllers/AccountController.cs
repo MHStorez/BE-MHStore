@@ -40,8 +40,8 @@ public class AccountController : ControllerBase
             return Unauthorized(exception.Message);
         }
     }
-        [HttpPost("login")]
-    public async Task<ActionResult<AccountModels.AuthResponse>> tyest(AccountModels.LoginRequest request)
+        [HttpPost("test")]
+    public async Task<ActionResult<AccountModels.AuthResponse>> Test(AccountModels.LoginRequest request)
     {
         try
         {
