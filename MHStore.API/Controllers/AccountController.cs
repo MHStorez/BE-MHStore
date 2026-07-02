@@ -16,16 +16,9 @@ public class AccountController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<ActionResult<AccountModels.AuthResponse>> Register(AccountModels.RegisterRequest request)
+    public ActionResult<AccountModels.AuthResponse> Register()
     {
-        try
-        {
-            return Ok(await _accountService.RegisterAsync(request));
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(exception.Message);
-        }
+        return StatusCode(StatusCodes.Status403Forbidden, "Registration is temporarily disabled.");
     }
 
     [HttpPost("login")]
